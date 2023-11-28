@@ -2,6 +2,16 @@ from segment_anything import sam_model_registry, SamPredictor
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
+
+def scale_to_255(tif_img):
+    np_img = np.asarray(tif_img, dtype=np.float32)
+    np_img = np_img - np_img.min()
+    np_img = np_img / np_img.max()
+    # scale to int and 255
+    np_img = np_img * 255
+    np_img = np_img.astype(np.int8)
+    return Image.fromarray(np_img)
 
 def show_mask(mask, ax, random_color=False):
     if random_color:
@@ -18,12 +28,20 @@ def show_points(coords, labels, ax, marker_size=375):
     ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
     ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)   
     
-sam = sam_model_registry["vit_l"](checkpoint="sam_vit_l_0b3195.pth")
+sam = sam_model_registry["vit_l"](checkpoint="sam_vit_l_0b3195.pth") # Change to sam_vit_b... for the smaller model
 predictor = SamPredictor(sam)
 
 def get_mask(image_path, pos_positions, neg_positions):
-    image = cv2.imread(image_path)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    if image_path.endswith(".tif") or image_path.endswith(".tiff"):
+        image = Image.open(image_path)
+        scaled_image_arr = scale_to_255(image)
+        scaled_image_arr = scaled_image_arr.convert("RGB")
+        image = np.asarray(scaled_image_arr)
+    else:
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+
     predictor.set_image(image)
 
     # Straight line down the middle

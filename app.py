@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk, ImageDraw
-from run_sam import get_mask
+from run_sam import get_mask, scale_to_255
+import numpy as np
 
 def segment(image_path, pos_positions, neg_positions):
     print(f"Segmenting {image_path} with {len(pos_positions)} positive and {len(neg_positions)} negative points.")
@@ -25,13 +26,16 @@ class App:
         
         self.neg_button = tk.Button(root, text="Negative Point", command=lambda: self.set_mode('neg'))
         self.neg_button.pack(side=tk.LEFT)
+
+        self.reset_button = tk.Button(root, text="Clear points", command=lambda: self.upload_image(file_path=self.image_path))
+        self.reset_button.pack(side=tk.LEFT)
         
         # TODO: Implement undo button
         #self.undo_button = tk.Button(root, text="Undo", command=self.undo)
         #self.undo_button.pack(side=tk.RIGHT)
         
         self.segment_button = tk.Button(root, text="Segment", command=self.perform_segmentation)
-        self.segment_button.pack(side=tk.RIGHT)
+        self.segment_button.pack(side=tk.LEFT)
         
         # Event bindings
         self.canvas.bind("<Button-1>", self.place_point)
@@ -44,18 +48,33 @@ class App:
         self.neg_positions = []
         self.mode = None
 
-    def upload_image(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg")])
+    def upload_image(self, file_path=None):
+        print("Clearing points")
+        self.clear_points()
+        print(self.pos_positions, self.neg_positions)
+        if file_path is None:
+            file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.bmp")])
         if not file_path:
             return
         self.image_path = file_path
-        self.image = Image.open(file_path).convert("RGB")
+        self.image = Image.open(file_path)
+        if file_path.endswith(".tif") or file_path.endswith(".tiff"): # Assume it is in the lab format (uint16)
+            # TODO: convert to int8
+            self.image = scale_to_255(self.image)
+        self.image = self.image.convert("RGB")
+        
         self.tk_image = ImageTk.PhotoImage(self.image)
         self.canvas.config(scrollregion=self.canvas.bbox(tk.ALL))
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_image)
         
     def set_mode(self, mode):
         self.mode = mode
+    
+    def clear_points(self):
+        self.pos_positions = []
+        self.neg_positions = []
+        return
+
 
     def place_point(self, event):
         if not self.mode or not self.image:
